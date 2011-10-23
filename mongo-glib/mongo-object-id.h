@@ -19,7 +19,7 @@
 #ifndef MONGO_OBJECT_ID_H
 #define MONGO_OBJECT_ID_H
 
-#include <glib.h>
+#include <glib-object.h>
 
 G_BEGIN_DECLS
 

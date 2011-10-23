@@ -134,11 +134,46 @@ append_tests (void)
    mongo_bson_unref(array);
 }
 
+static MongoBson *
+get_bson (const gchar *name)
+{
+   const gchar *filename = g_build_filename("tests", "bson", name, NULL);
+   GError *error = NULL;
+   gchar *buffer;
+   gsize length;
+   MongoBson *bson;
+
+   if (!g_file_get_contents(filename, (gchar **)&buffer, &length, &error)) {
+      g_assert_no_error(error);
+      g_assert(FALSE);
+   }
+
+   bson = mongo_bson_new_from_data((const guint8 *)buffer, length);
+   g_free(buffer);
+   g_assert(bson);
+
+   return bson;
+}
+
+static void
+iter_tests (void)
+{
+   MongoBson *bson;
+   MongoBsonIter iter;
+
+   bson = get_bson("test1.bson");
+
+   mongo_bson_iter_init(&iter, bson);
+   g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpstr("int", ==, mongo_bson_iter_get_key(&iter));
+}
+
 gint
 main (gint   argc,
       gchar *argv[])
 {
    g_test_init(&argc, &argv, NULL);
    g_test_add_func("/MongoBson/append_tests", append_tests);
+   g_test_add_func("/MongoBson/iter_tests", iter_tests);
    return g_test_run();
 }

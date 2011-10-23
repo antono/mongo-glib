@@ -26,6 +26,7 @@ G_BEGIN_DECLS
 typedef struct _MongoObjectId MongoObjectId;
 
 MongoObjectId *mongo_object_id_new           (void);
+MongoObjectId *mongo_object_id_new_from_data (const guint8        *bytes);
 MongoObjectId *mongo_object_id_copy          (const MongoObjectId *object_id);
 void           mongo_object_id_free          (MongoObjectId       *object_id);
 GType          mongo_object_id_get_type      (void) G_GNUC_CONST;

@@ -26,6 +26,20 @@ struct _MongoObjectId
 };
 
 MongoObjectId *
+mongo_object_id_new_from_data (const guint8 *bytes)
+{
+   MongoObjectId *object_id;
+
+   object_id = g_slice_new0(MongoObjectId);
+
+   if (bytes) {
+      memcpy(object_id, bytes, sizeof *object_id);
+   }
+
+   return object_id;
+}
+
+MongoObjectId *
 mongo_object_id_copy (const MongoObjectId *object_id)
 {
    MongoObjectId *copy;
@@ -34,6 +48,7 @@ mongo_object_id_copy (const MongoObjectId *object_id)
 
    copy = g_slice_new(MongoObjectId);
    memcpy(copy, object_id, sizeof *object_id);
+
    return copy;
 }
 

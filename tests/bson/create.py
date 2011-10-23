@@ -1,0 +1,31 @@
+#!/usr/bin/env python
+
+import bson
+from   collections import OrderedDict
+from   datetime import datetime
+import os
+import types
+import re
+
+def toson(doc):
+    return bson.SON(doc)
+
+def encode(doc):
+    return bson.BSON.encode(toson(doc))
+
+def save(name, doc):
+    name = os.path.join('bson', name)
+    file(name, 'w').write(encode(doc))
+
+save('test1.bson', {'int': 1})
+save('test2.bson', {'int64': long(1)})
+save('test3.bson', {'double': 1.123})
+save('test4.bson', {'utc': datetime(2011, 10, 22, 12, 13, 14, 123000)})
+save('test5.bson', {'string': 'some string'})
+save('test6.bson', {'array[int]': [1, 2, 3, 4, 5, 6]})
+save('test7.bson', {'array[double]': [1.123, 2.123]})
+save('test8.bson', {'document': toson({'int': 1})})
+save('test9.bson', {'null': None})
+save('test10.bson', {'regex': re.compile('1234', re.IGNORECASE)})
+save('test11.bson', {'hello': 'world'})
+save('test12.bson', {'BSON': ['awesome', 5.05, 1986]})

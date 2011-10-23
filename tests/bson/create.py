@@ -14,7 +14,6 @@ def encode(doc):
     return bson.BSON.encode(toson(doc))
 
 def save(name, doc):
-    name = os.path.join('bson', name)
     file(name, 'w').write(encode(doc))
 
 save('test1.bson', {'int': 1})

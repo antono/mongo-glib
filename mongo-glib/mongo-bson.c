@@ -169,7 +169,7 @@ mongo_bson_get_type (void)
 static void
 mongo_bson_append (MongoBson    *bson,
                    guint8        type,
-                   const gchar  *field,
+                   const gchar  *key,
                    const guint8 *data1,
                    gsize         len1,
                    const guint8 *data2,
@@ -177,11 +177,11 @@ mongo_bson_append (MongoBson    *bson,
 {
    const guint8 trailing = 0;
    gint32 doc_len;
-   gsize field_len;
+   gsize key_len;
 
    g_return_if_fail(bson != NULL);
    g_return_if_fail(type != 0);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
    g_return_if_fail(data1 != NULL || len1 == 0);
    g_return_if_fail(data2 != NULL || len2 == 0);
 
@@ -192,8 +192,8 @@ mongo_bson_append (MongoBson    *bson,
    g_byte_array_append(bson->buf, &type, 1);
 
    /* Field name as cstring */
-   field_len = strlen(field) + 1;
-   g_byte_array_append(bson->buf, (guint8 *)field, field_len);
+   key_len = strlen(key) + 1;
+   g_byte_array_append(bson->buf, (guint8 *)key, key_len);
 
    /* Add first data section if needed */
    if (data1) {
@@ -207,7 +207,7 @@ mongo_bson_append (MongoBson    *bson,
 
    /* Update document length */
    doc_len = GINT_FROM_LE(*(gint32 *)bson->buf->data);
-   doc_len += 1 + field_len + len1 + len2;
+   doc_len += 1 + key_len + len1 + len2;
    *(gint32 *)bson->buf->data = GINT_TO_LE(doc_len);
 
    /* Add trailing NULL byte */
@@ -216,54 +216,54 @@ mongo_bson_append (MongoBson    *bson,
 
 void
 mongo_bson_append_array (MongoBson   *bson,
-                         const gchar *field,
+                         const gchar *key,
                          MongoBson   *value)
 {
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
    g_return_if_fail(value != NULL);
 
-   mongo_bson_append(bson, BSON_ARRAY, field,
+   mongo_bson_append(bson, BSON_ARRAY, key,
                      value->buf->data, value->buf->len,
                      NULL, 0);
 }
 
 void
 mongo_bson_append_boolean (MongoBson   *bson,
-                           const gchar *field,
+                           const gchar *key,
                            gboolean     value)
 {
    guint8 b = !!value;
 
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
 
-   mongo_bson_append(bson, BSON_BOOLEAN, field, &b, 1, NULL, 0);
+   mongo_bson_append(bson, BSON_BOOLEAN, key, &b, 1, NULL, 0);
 }
 
 void
 mongo_bson_append_bson (MongoBson   *bson,
-                        const gchar *field,
+                        const gchar *key,
                         MongoBson   *value)
 {
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
    g_return_if_fail(value != NULL);
 
-   mongo_bson_append(bson, BSON_DOCUMENT, field,
+   mongo_bson_append(bson, BSON_DOCUMENT, key,
                      value->buf->data, value->buf->len,
                      NULL, 0);
 }
 
 void
 mongo_bson_append_date_time (MongoBson   *bson,
-                             const gchar *field,
+                             const gchar *key,
                              GDateTime   *value)
 {
    GTimeVal tv;
 
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
    g_return_if_fail(value != NULL);
 
    if (!g_date_time_to_timeval(value, &tv)) {
@@ -271,133 +271,133 @@ mongo_bson_append_date_time (MongoBson   *bson,
       return;
    }
 
-   mongo_bson_append_timeval(bson, field, &tv);
+   mongo_bson_append_timeval(bson, key, &tv);
 }
 
 void
 mongo_bson_append_double (MongoBson   *bson,
-                          const gchar *field,
+                          const gchar *key,
                           gdouble      value)
 {
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
 
-   mongo_bson_append(bson, BSON_DOUBLE, field,
+   mongo_bson_append(bson, BSON_DOUBLE, key,
                      (const guint8 *)&value, sizeof value,
                      NULL, 0);
 }
 
 void
 mongo_bson_append_int (MongoBson   *bson,
-                       const gchar *field,
+                       const gchar *key,
                        gint32       value)
 {
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
 
-   mongo_bson_append(bson, BSON_INT32, field,
+   mongo_bson_append(bson, BSON_INT32, key,
                      (const guint8 *)&value, sizeof value,
                      NULL, 0);
 }
 
 void
 mongo_bson_append_int64 (MongoBson   *bson,
-                         const gchar *field,
+                         const gchar *key,
                          gint64       value)
 {
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
 
-   mongo_bson_append(bson, BSON_INT64, field,
+   mongo_bson_append(bson, BSON_INT64, key,
                      (const guint8 *)&value, sizeof value,
                      NULL, 0);
 }
 
 void
 mongo_bson_append_null (MongoBson   *bson,
-                        const gchar *field)
+                        const gchar *key)
 {
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
 
-   mongo_bson_append(bson, BSON_NULL, field, NULL, 0, NULL, 0);
+   mongo_bson_append(bson, BSON_NULL, key, NULL, 0, NULL, 0);
 }
 
 void
 mongo_bson_append_object_id (MongoBson     *bson,
-                             const gchar   *field,
+                             const gchar   *key,
                              MongoObjectId *object_id)
 {
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
    g_return_if_fail(object_id != NULL);
 
-   mongo_bson_append(bson, BSON_OBJECT_ID, field,
+   mongo_bson_append(bson, BSON_OBJECT_ID, key,
                      (const guint8 *)object_id, 12,
                      NULL, 0);
 }
 
 void
 mongo_bson_append_regex (MongoBson   *bson,
-                         const gchar *field,
+                         const gchar *key,
                          const gchar *regex,
                          const gchar *options)
 {
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
    g_return_if_fail(regex != NULL);
 
    if (!options) {
       options = "";
    }
 
-   mongo_bson_append(bson, BSON_REGEX, field,
+   mongo_bson_append(bson, BSON_REGEX, key,
                      (const guint8 *)regex, strlen(regex) + 1,
                      (const guint8 *)options, strlen(options) + 1);
 }
 
 void
 mongo_bson_append_string (MongoBson   *bson,
-                          const gchar *field,
+                          const gchar *key,
                           const gchar *value)
 {
    gint32 value_len;
 
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
 
    value = value ? value : "";
    value_len = strlen(value) + 1;
 
-   mongo_bson_append(bson, BSON_UTF8, field,
+   mongo_bson_append(bson, BSON_UTF8, key,
                      (const guint8 *)&value_len, sizeof value_len,
                      (const guint8 *)value, value_len);
 }
 
 void
 mongo_bson_append_timeval (MongoBson   *bson,
-                           const gchar *field,
+                           const gchar *key,
                            GTimeVal    *value)
 {
    guint64 msec;
 
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
    g_return_if_fail(value != NULL);
 
    msec = (value->tv_sec * 1000) + (value->tv_usec / 1000);
-   mongo_bson_append(bson, BSON_DATE_TIME, field,
+   mongo_bson_append(bson, BSON_DATE_TIME, key,
                      (const guint8 *)&msec, sizeof msec,
                      NULL, 0);
 }
 
 void
 mongo_bson_append_undefined (MongoBson   *bson,
-                             const gchar *field)
+                             const gchar *key)
 {
    g_return_if_fail(bson != NULL);
-   g_return_if_fail(field != NULL);
+   g_return_if_fail(key != NULL);
 
-   mongo_bson_append(bson, BSON_UNDEFINED, field,
+   mongo_bson_append(bson, BSON_UNDEFINED, key,
                      NULL, 0, NULL, 0);
 }

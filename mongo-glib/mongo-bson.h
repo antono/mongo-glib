@@ -37,43 +37,43 @@ MongoBson    *mongo_bson_ref              (MongoBson *bson);
 void          mongo_bson_unref            (MongoBson *bson);
 
 void          mongo_bson_append_array     (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            MongoBson     *value);
 void          mongo_bson_append_boolean   (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            gboolean       value);
 void          mongo_bson_append_bson      (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            MongoBson     *value);
 void          mongo_bson_append_date_time (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            GDateTime     *value);
 void          mongo_bson_append_double    (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            gdouble        value);
 void          mongo_bson_append_int       (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            gint32         value);
 void          mongo_bson_append_int64     (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            gint64         value);
 void          mongo_bson_append_null      (MongoBson     *bson,
-                                           const gchar   *field);
+                                           const gchar   *key);
 void          mongo_bson_append_object_id (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            MongoObjectId *object_id);
 void          mongo_bson_append_regex     (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            const gchar   *regex,
                                            const gchar   *options);
 void          mongo_bson_append_string    (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            const gchar   *value);
 void          mongo_bson_append_timeval   (MongoBson     *bson,
-                                           const gchar   *field,
+                                           const gchar   *key,
                                            GTimeVal      *value);
 void          mongo_bson_append_undefined (MongoBson     *bson,
-                                           const gchar   *field);
+                                           const gchar   *key);
 
 G_END_DECLS
 

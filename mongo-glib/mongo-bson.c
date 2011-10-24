@@ -223,6 +223,7 @@ mongo_bson_append (MongoBson    *bson,
    g_return_if_fail(bson != NULL);
    g_return_if_fail(type != 0);
    g_return_if_fail(key != NULL);
+   g_return_if_fail(g_utf8_validate(key, -1, NULL));
    g_return_if_fail(data1 != NULL || len1 == 0);
    g_return_if_fail(data2 != NULL || len2 == 0);
 
@@ -406,6 +407,7 @@ mongo_bson_append_string (MongoBson   *bson,
 
    g_return_if_fail(bson != NULL);
    g_return_if_fail(key != NULL);
+   g_return_if_fail(g_utf8_validate(value, -1, NULL));
 
    value = value ? value : "";
    value_len = strlen(value) + 1;

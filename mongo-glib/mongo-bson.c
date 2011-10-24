@@ -759,6 +759,25 @@ mongo_bson_iter_get_value_type (MongoBsonIter *iter)
    }
 }
 
+/**
+ * mongo_bson_iter_recurse:
+ * @iter: (in): A #MongoBsonIter.
+ * @child: (out): A #MongoBsonIter.
+ *
+ * Recurses into the child BSON document found at the key currently observed
+ * by the #MongoBsonIter. The @child #MongoBsonIter is initialized.
+ *
+ * Returns: %TRUE if @child is initialized; otherwise %FALSE.
+ */
+gboolean
+mongo_bson_iter_recurse (MongoBsonIter *iter,
+                         MongoBsonIter *child)
+{
+   /*
+    * TODO:
+    */
+}
+
 gboolean
 mongo_bson_iter_next (MongoBsonIter *iter)
 {

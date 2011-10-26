@@ -57,10 +57,6 @@ struct _MongoBsonIter
    gpointer user_data2;
    gpointer user_data3;
    gpointer user_data4;
-   gpointer user_data5;
-   gpointer user_data6;
-   gpointer user_data7;
-   gpointer user_data8;
 };
 
 GType          mongo_bson_get_type                 (void) G_GNUC_CONST;

@@ -63,56 +63,53 @@ struct _MongoBsonIter
    gpointer user_data8;
 };
 
-GType         mongo_bson_get_type         (void) G_GNUC_CONST;
-GType         mongo_bson_type_get_type    (void) G_GNUC_CONST;
-const guint8 *mongo_bson_get_data         (MongoBson     *bson,
-                                           gsize         *length);
-MongoBson    *mongo_bson_new              (void);
-MongoBson    *mongo_bson_new_from_data    (const guint8  *buffer,
-                                           gsize          max_length);
-MongoBson    *mongo_bson_ref              (MongoBson     *bson);
-void          mongo_bson_unref            (MongoBson     *bson);
-
-void          mongo_bson_append_array     (MongoBson     *bson,
-                                           const gchar   *key,
-                                           MongoBson     *value);
-void          mongo_bson_append_boolean   (MongoBson     *bson,
-                                           const gchar   *key,
-                                           gboolean       value);
-void          mongo_bson_append_bson      (MongoBson     *bson,
-                                           const gchar   *key,
-                                           MongoBson     *value);
-void          mongo_bson_append_date_time (MongoBson     *bson,
-                                           const gchar   *key,
-                                           GDateTime     *value);
-void          mongo_bson_append_double    (MongoBson     *bson,
-                                           const gchar   *key,
-                                           gdouble        value);
-void          mongo_bson_append_int       (MongoBson     *bson,
-                                           const gchar   *key,
-                                           gint32         value);
-void          mongo_bson_append_int64     (MongoBson     *bson,
-                                           const gchar   *key,
-                                           gint64         value);
-void          mongo_bson_append_null      (MongoBson     *bson,
-                                           const gchar   *key);
-void          mongo_bson_append_object_id (MongoBson     *bson,
-                                           const gchar   *key,
-                                           MongoObjectId *object_id);
-void          mongo_bson_append_regex     (MongoBson     *bson,
-                                           const gchar   *key,
-                                           const gchar   *regex,
-                                           const gchar   *options);
-void          mongo_bson_append_string    (MongoBson     *bson,
-                                           const gchar   *key,
-                                           const gchar   *value);
-void          mongo_bson_append_timeval   (MongoBson     *bson,
-                                           const gchar   *key,
-                                           GTimeVal      *value);
-void          mongo_bson_append_undefined (MongoBson     *bson,
-                                           const gchar   *key);
-
-
+GType          mongo_bson_get_type                 (void) G_GNUC_CONST;
+GType          mongo_bson_type_get_type            (void) G_GNUC_CONST;
+const guint8  *mongo_bson_get_data                 (MongoBson      *bson,
+                                                    gsize          *length);
+MongoBson     *mongo_bson_new                      (void);
+MongoBson     *mongo_bson_new_from_data            (const guint8   *buffer,
+                                                    gsize           max_length);
+MongoBson     *mongo_bson_ref                      (MongoBson      *bson);
+void           mongo_bson_unref                    (MongoBson      *bson);
+void           mongo_bson_append_array             (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    MongoBson      *value);
+void           mongo_bson_append_boolean           (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    gboolean       value);
+void           mongo_bson_append_bson              (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    MongoBson      *value);
+void           mongo_bson_append_date_time         (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    GDateTime      *value);
+void           mongo_bson_append_double            (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    gdouble         value);
+void           mongo_bson_append_int               (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    gint32          value);
+void           mongo_bson_append_int64             (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    gint64          value);
+void           mongo_bson_append_null              (MongoBson      *bson,
+                                                    const gchar    *key);
+void           mongo_bson_append_object_id         (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    MongoObjectId  *object_id);
+void           mongo_bson_append_regex             (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    const gchar    *regex,
+                                                    const gchar    *options);
+void           mongo_bson_append_string            (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    const gchar    *value);
+void           mongo_bson_append_timeval           (MongoBson      *bson,
+                                                    const gchar    *key,
+                                                    GTimeVal       *value);
+void           mongo_bson_append_undefined         (MongoBson      *bson,
+                                                    const gchar    *key);
 void           mongo_bson_iter_init                (MongoBsonIter  *iter,
                                                     MongoBson      *bson);
 gboolean       mongo_bson_iter_find                (MongoBsonIter  *iter,

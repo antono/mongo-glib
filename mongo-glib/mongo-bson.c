@@ -537,6 +537,7 @@ mongo_bson_append_string (MongoBson   *bson,
                           const gchar *value)
 {
    gint32 value_len;
+   gint32 value_len_swab;
 
    g_return_if_fail(bson != NULL);
    g_return_if_fail(key != NULL);
@@ -544,9 +545,10 @@ mongo_bson_append_string (MongoBson   *bson,
 
    value = value ? value : "";
    value_len = strlen(value) + 1;
+   value_len_swab = GINT_TO_LE(value_len);
 
    mongo_bson_append(bson, MONGO_BSON_UTF8, key,
-                     (const guint8 *)&value_len, sizeof value_len,
+                     (const guint8 *)&value_len_swab, sizeof value_len_swab,
                      (const guint8 *)value, value_len);
 }
 

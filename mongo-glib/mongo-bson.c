@@ -1143,8 +1143,22 @@ mongo_bson_iter_next (MongoBsonIter *iter)
       }
       goto failure;
    case MONGO_BSON_REGEX:
-      g_warning("TODO REGEX");
-      goto failure;
+      value1 = &rawbuf[offset];
+      max_len = first_nul((gchar *)value1, rawbuf_len - offset - 1);
+      if (!g_utf8_validate((gchar *)value1, max_len, &end)) {
+         goto failure;
+      }
+      offset += max_len + 1;
+      if ((offset + 1) >= rawbuf_len) {
+         goto failure;
+      }
+      value2 = &rawbuf[offset];
+      max_len = first_nul((gchar *)value2, rawbuf_len - offset - 1);
+      if (!g_utf8_validate((gchar *)value2, max_len, &end)) {
+         goto failure;
+      }
+      offset += max_len + 1;
+      goto success;
    case MONGO_BSON_INT32:
       if ((offset + 4) < rawbuf_len) {
          value1 = &rawbuf[offset];

@@ -162,6 +162,8 @@ iter_tests (void)
    MongoBsonIter iter;
    GDateTime *dt;
    GTimeVal tv;
+   const gchar *regex = NULL;
+   const gchar *options = NULL;
 
    bson = get_bson("test1.bson");
    mongo_bson_iter_init(&iter, bson);
@@ -224,6 +226,16 @@ iter_tests (void)
    g_assert(mongo_bson_iter_next(&iter));
    g_assert_cmpint(MONGO_BSON_NULL, ==, mongo_bson_iter_get_value_type(&iter));
    g_assert_cmpstr("null", ==, mongo_bson_iter_get_key(&iter));
+   g_assert(!mongo_bson_iter_next(&iter));
+   mongo_bson_unref(bson);
+
+   bson = get_bson("test10.bson");
+   mongo_bson_iter_init(&iter, bson);
+   g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpint(MONGO_BSON_REGEX, ==, mongo_bson_iter_get_value_type(&iter));
+   mongo_bson_iter_get_value_regex(&iter, &regex, &options);
+   g_assert_cmpstr(regex, ==, "1234");
+   g_assert_cmpstr(options, ==, "i");
    g_assert(!mongo_bson_iter_next(&iter));
    mongo_bson_unref(bson);
 

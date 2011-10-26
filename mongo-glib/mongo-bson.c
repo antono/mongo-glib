@@ -93,7 +93,7 @@ MongoBson *
 mongo_bson_new (void)
 {
    MongoBson *bson;
-   gint32 len = 5;
+   gint32 len = GINT_TO_LE(5);
    guint8 trailing = 0;
 
    bson = g_slice_new0(MongoBson);

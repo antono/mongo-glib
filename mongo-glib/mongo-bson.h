@@ -53,10 +53,14 @@ enum _MongoBsonType
 struct _MongoBsonIter
 {
    /*< private >*/
-   gpointer user_data1;
-   gpointer user_data2;
-   gpointer user_data3;
-   gpointer user_data4;
+   gpointer user_data1; /* Raw data buffer */
+   gpointer user_data2; /* Raw buffer length */
+   gpointer user_data3; /* Offset */
+   gpointer user_data4; /* Key */
+   gpointer user_data5; /* Type */
+   gpointer user_data6; /* Value1 */
+   gpointer user_data7; /* Value2 */
+   gpointer user_data8;
 };
 
 GType          mongo_bson_get_type                 (void) G_GNUC_CONST;
@@ -122,7 +126,8 @@ gint64         mongo_bson_iter_get_value_int64     (MongoBsonIter  *iter);
 void           mongo_bson_iter_get_value_regex     (MongoBsonIter  *iter,
                                                     const gchar   **regex,
                                                     const gchar   **options);
-const gchar   *mongo_bson_iter_get_value_string    (MongoBsonIter  *iter);
+const gchar   *mongo_bson_iter_get_value_string    (MongoBsonIter  *iter,
+                                                    gsize          *length);
 void           mongo_bson_iter_get_value_timeval   (MongoBsonIter  *iter,
                                                     GTimeVal       *value);
 MongoBsonType  mongo_bson_iter_get_value_type      (MongoBsonIter  *iter);

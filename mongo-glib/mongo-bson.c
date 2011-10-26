@@ -26,13 +26,8 @@ struct _MongoBson
    GByteArray *buf;
 };
 
-#define ENSURE_TYPE(bson, offset, TYPE, ret) \
-   G_STMT_START { \
-      if ((bson)->buf->data[(offset)] != TYPE) { \
-         g_warning("Request for invalid type"); \
-         return ret; \
-      } \
-   } G_STMT_END
+#define ITER_IS_TYPE(iter, type) \
+   (GPOINTER_TO_INT(iter->user_data5) == type)
 
 /**
  * mongo_bson_dispose:
@@ -613,21 +608,30 @@ mongo_bson_iter_init (MongoBsonIter *iter,
    g_return_if_fail(bson != NULL);
 
    memset(iter, 0, sizeof *iter);
-   iter->user_data1 = bson;
+   iter->user_data1 = bson->buf->data;
+   iter->user_data2 = GINT_TO_POINTER(bson->buf->len);
+   iter->user_data3 = GINT_TO_POINTER(3); /* End of size buffer */
 }
 
+/**
+ * mongo_bson_iter_find:
+ * @iter: (in): A #MongoBsonIter.
+ * @key: (in): A key to find in the BSON document.
+ *
+ * Iterates through all upcoming keys in a #MongoBsonIter until @key is
+ * found or the end of the document has been reached.
+ *
+ * Returns: %TRUE if @key was found, otherwise %FALSE.
+ */
 gboolean
 mongo_bson_iter_find (MongoBsonIter *iter,
                       const gchar   *key)
 {
-   const gchar *cur_key;
-
    g_return_val_if_fail(iter != NULL, FALSE);
    g_return_val_if_fail(key != NULL, FALSE);
 
-   while (mongo_bson_iter_next(iter)) {
-      cur_key = mongo_bson_iter_get_key(iter);
-      if (!g_strcmp0(cur_key, key)) {
+   while (mongo_bson_iter_next(iter)){
+      if (!g_strcmp0(key, mongo_bson_iter_get_key(iter))) {
          return TRUE;
       }
    }
@@ -635,97 +639,131 @@ mongo_bson_iter_find (MongoBsonIter *iter,
    return FALSE;
 }
 
+/**
+ * mongo_bson_iter_get_key:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches the key currently pointed to by @iter.
+ *
+ * Returns: A string containing the key.
+ */
 const gchar *
 mongo_bson_iter_get_key (MongoBsonIter *iter)
 {
-   const gchar *key;
-   MongoBson *bson;
-   gsize offset;
+   g_return_val_if_fail(iter != NULL, NULL);
+   return (const gchar *)iter->user_data4;
+}
+
+static MongoBson *
+mongo_bson_iter_get_value_document (MongoBsonIter *iter,
+                                    MongoBsonType  type)
+{
+   const guint8 *buffer;
+   gpointer endbuf;
+   guint32 array_len;
 
    g_return_val_if_fail(iter != NULL, NULL);
    g_return_val_if_fail(iter->user_data1 != NULL, NULL);
    g_return_val_if_fail(iter->user_data2 != NULL, NULL);
+   g_return_val_if_fail(iter->user_data6 != NULL, NULL);
+   g_return_val_if_fail((type == MONGO_BSON_ARRAY) ||
+                        (type == MONGO_BSON_DOCUMENT), NULL);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   key = (gchar *)&bson->buf->data[offset + 1];
+   if (G_LIKELY(ITER_IS_TYPE(iter, type))) {
+      endbuf = GSIZE_TO_POINTER(GPOINTER_TO_SIZE(iter->user_data1) +
+                                GPOINTER_TO_SIZE(iter->user_data2));
+      if ((iter->user_data6 + 5) > endbuf) {
+         return NULL;
+      }
+      memcpy(&array_len, iter->user_data6, sizeof array_len);
+      array_len = GINT_FROM_LE(array_len);
+      if ((iter->user_data6 + array_len) < endbuf) {
+         return NULL;
+      }
+      buffer = iter->user_data6;
+      return mongo_bson_new_from_data(buffer, array_len);
+   }
 
-   return key;
+   if (type == MONGO_BSON_ARRAY) {
+      g_warning("Current key is not an array.");
+   } else if (type == MONGO_BSON_DOCUMENT) {
+      g_warning("Current key is not a document.");
+   } else {
+      g_assert_not_reached();
+   }
+
+   return NULL;
 }
 
+/**
+ * mongo_bson_iter_get_value_array:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches the array document current pointed to by @iter. This makes a
+ * copy of the document and returns a new #MongoBson instance. For more
+ * optimized cases, you may want to use mongo_bson_iter_recurse() to avoid
+ * copying the memory if only iteration is needed.
+ *
+ * Returns: (transfer full): A #MongoBson.
+ */
 MongoBson *
 mongo_bson_iter_get_value_array (MongoBsonIter *iter)
 {
-   //const guint8 *buf;
-   //MongoBson *bson;
-   MongoBson *array = NULL;
-   //gsize value_offset;
-
-   g_return_val_if_fail(iter != NULL, NULL);
-   g_return_val_if_fail(iter->user_data1 != NULL, NULL);
-   g_return_val_if_fail(iter->user_data2 != NULL, NULL);
-   g_return_val_if_fail(iter->user_data3 != NULL, NULL);
-
-   //bson = iter->user_data1;
-   //value_offset = (gsize)iter->user_data3;
-   //buf = (MongoBson *)&bson->buf->data[value_offset];
-
-   //array = mongo_bson_new();
-   //array->buf =
-
-   /*
-    * copy buffer into new structure
-    */
-
-   return array;
+   return mongo_bson_iter_get_value_document(iter, MONGO_BSON_ARRAY);
 }
 
+/**
+ * mongo_bson_iter_get_value_array:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches the current value pointed to by the iterator, expecting it to
+ * be a boolean.
+ *
+ * Returns: The current value.
+ */
 gboolean
 mongo_bson_iter_get_value_boolean (MongoBsonIter *iter)
 {
-   MongoBson *bson;
-   gboolean value;
-   gsize value_offset;
-   gsize offset;
+   guint8 b;
 
    g_return_val_if_fail(iter != NULL, 0);
-   g_return_val_if_fail(iter->user_data1 != NULL, 0);
-   g_return_val_if_fail(iter->user_data2 != NULL, 0);
-   g_return_val_if_fail(iter->user_data3 != NULL, 0);
+   g_return_val_if_fail(iter->user_data6 != NULL, 0);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   ENSURE_TYPE(bson, offset, MONGO_BSON_BOOLEAN, 0);
-   value_offset = (gsize)iter->user_data3;
-   value = *(guint8 *)&bson->buf->data[value_offset];
+   if (ITER_IS_TYPE(iter, MONGO_BSON_BOOLEAN)) {
+      memcpy(&b, iter->user_data6, sizeof b);
+      return !!b;
+   }
 
-   return value;
+   g_warning("Current key is not a boolean.");
+
+   return FALSE;
 }
 
+/**
+ * mongo_bson_iter_get_value_bson:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches the current value pointed to by @iter if it is a
+ * %MONGO_BSON_DOCUMENT. The document is copied and returned as a new
+ * #MongoBson instance. If you simply need to iterate the child document,
+ * you may want to use mongo_bson_iter_recurse().
+ *
+ * Returns: A #MongoBson if successful; otherwise %NULL.
+ */
 MongoBson *
 mongo_bson_iter_get_value_bson (MongoBsonIter *iter)
 {
-   const guint8 *buf;
-   MongoBson *bson;
-   MongoBson *child;
-   gsize offset;
-   gsize value_offset;
-
-   g_return_val_if_fail(iter != NULL, NULL);
-   g_return_val_if_fail(iter->user_data1 != NULL, NULL);
-   g_return_val_if_fail(iter->user_data2 != NULL, NULL);
-   g_return_val_if_fail(iter->user_data3 != NULL, NULL);
-
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   ENSURE_TYPE(bson, offset, MONGO_BSON_DOCUMENT, NULL);
-   value_offset = (gsize)iter->user_data3;
-   buf = (const guint8 *)&bson->buf->data[value_offset];
-   child = mongo_bson_new_from_data(buf, bson->buf->len - value_offset);
-
-   return child;
+   return mongo_bson_iter_get_value_document(iter, MONGO_BSON_DOCUMENT);
 }
 
+/**
+ * mongo_bson_iter_get_value_date_time:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches a #GDateTime for the current value pointed to by @iter.
+ *
+ * Returns: A new #GDateTime which should be freed with g_date_time_unref().
+ */
 GDateTime *
 mongo_bson_iter_get_value_date_time (MongoBsonIter *iter)
 {
@@ -737,92 +775,121 @@ mongo_bson_iter_get_value_date_time (MongoBsonIter *iter)
    return g_date_time_new_from_timeval_utc(&tv);
 }
 
+/**
+ * mongo_bson_iter_get_value_double:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches the current value pointed to by @iter if it is a
+ * %MONGO_BSON_DOUBLE.
+ *
+ * Returns: A #gdouble.
+ */
 gdouble
 mongo_bson_iter_get_value_double (MongoBsonIter *iter)
 {
-   MongoBson *bson;
    gdouble value;
-   gsize value_offset;
-   gsize offset;
 
    g_return_val_if_fail(iter != NULL, 0);
-   g_return_val_if_fail(iter->user_data1 != NULL, 0);
-   g_return_val_if_fail(iter->user_data2 != NULL, 0);
-   g_return_val_if_fail(iter->user_data3 != NULL, 0);
+   g_return_val_if_fail(iter->user_data6 != NULL, 0);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   ENSURE_TYPE(bson, offset, MONGO_BSON_DOUBLE, 0);
-   value_offset = (gsize)iter->user_data3;
-   value = *(gdouble *)&bson->buf->data[value_offset];
+   if (ITER_IS_TYPE(iter, MONGO_BSON_DOUBLE)) {
+      memcpy(&value, iter->user_data6, sizeof value);
+      return value;
+   }
 
-   return value;
+   g_warning("Current value is not a double.");
+
+   return 0.0;
 }
 
+/**
+ * mongo_bson_iter_get_value_object_id:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches the current value pointed to by @iter if it is a
+ * %MONGO_BSON_OBJECT_ID. The resulting #MongoObjectId should be freed
+ * with mongo_object_id_free().
+ *
+ * Returns: (transfer full): A #MongoObjectId.
+ */
 MongoObjectId *
 mongo_bson_iter_get_value_object_id (MongoBsonIter *iter)
 {
-   MongoObjectId *object_id;
-   MongoBson *bson;
-   gsize offset;
-   gsize value_offset;
-
    g_return_val_if_fail(iter != NULL, NULL);
-   g_return_val_if_fail(iter->user_data1 != NULL, NULL);
+   g_return_val_if_fail(iter->user_data6 != NULL, NULL);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   ENSURE_TYPE(bson, offset, MONGO_BSON_INT32, 0);
-   value_offset = (gsize)iter->user_data3;
-   object_id = mongo_object_id_new_from_data(&bson->buf->data[value_offset]);
+   if (ITER_IS_TYPE(iter, MONGO_BSON_OBJECT_ID)) {
+      return mongo_object_id_new_from_data(iter->user_data6);
+   }
 
-   return object_id;
+   g_warning("Current value is not an ObjectId.");
+
+   return NULL;
 }
 
+/**
+ * mongo_bson_iter_get_value_int:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches the current value pointed to by @iter if it is a
+ * %MONGO_BSON_INT32.
+ *
+ * Returns: A #gint32 containing the value.
+ */
 gint32
 mongo_bson_iter_get_value_int (MongoBsonIter *iter)
 {
-   MongoBson *bson;
    gint32 value;
-   gsize value_offset;
-   gsize offset;
 
    g_return_val_if_fail(iter != NULL, 0);
-   g_return_val_if_fail(iter->user_data1 != NULL, 0);
-   g_return_val_if_fail(iter->user_data2 != NULL, 0);
-   g_return_val_if_fail(iter->user_data3 != NULL, 0);
+   g_return_val_if_fail(iter->user_data6 != NULL, 0);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   ENSURE_TYPE(bson, offset, MONGO_BSON_INT32, 0);
-   value_offset = (gsize)iter->user_data3;
-   value = *(gint32 *)&bson->buf->data[value_offset];
+   if (ITER_IS_TYPE(iter, MONGO_BSON_INT32)) {
+      memcpy(&value, iter->user_data6, sizeof value);
+      return GINT_FROM_LE(value);
+   }
 
-   return value;
+   g_warning("Current value is not an int32.");
+
+   return 0;
 }
 
+/**
+ * mongo_bson_iter_get_value_int64:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches the current value pointed to by @iter if it is a
+ * %MONGO_BSON_INT64.
+ *
+ * Returns: A #gint64.
+ */
 gint64
 mongo_bson_iter_get_value_int64 (MongoBsonIter *iter)
 {
-   MongoBson *bson;
    gint64 value;
-   gsize value_offset;
-   gsize offset;
 
-   g_return_val_if_fail(iter != NULL, 0);
-   g_return_val_if_fail(iter->user_data1 != NULL, 0);
-   g_return_val_if_fail(iter->user_data2 != NULL, 0);
-   g_return_val_if_fail(iter->user_data3 != NULL, 0);
+   g_return_val_if_fail(iter != NULL, 0L);
+   g_return_val_if_fail(iter->user_data6 != NULL, 0L);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   ENSURE_TYPE(bson, offset, MONGO_BSON_INT64, 0);
-   value_offset = (gsize)iter->user_data3;
-   value = *(gint64 *)&bson->buf->data[value_offset];
+   if (ITER_IS_TYPE(iter, MONGO_BSON_INT64)) {
+      memcpy(&value, iter->user_data6, sizeof value);
+      return GINT64_FROM_LE(value);
+   }
 
-   return value;
+   g_warning("Current value is not an int64.");
+
+   return 0L;
 }
 
+/**
+ * mongo_bson_iter_get_value_regex:
+ * @iter: (in): A #MongoBsonIter.
+ * @regex: (out) (allow-none) (transfer none): A location for a string containing the regex.
+ * @options: (out) (allow-none) (transfer none): A location for a string containing the options.
+ *
+ * Fetches the current value pointed to by @iter if it is a regex. The values
+ * MUST NOT be modified or freed.
+ */
 void
 mongo_bson_iter_get_value_regex (MongoBsonIter  *iter,
                                  const gchar   **regex,
@@ -830,69 +897,98 @@ mongo_bson_iter_get_value_regex (MongoBsonIter  *iter,
 {
    g_return_if_fail(iter != NULL);
 
+   if (ITER_IS_TYPE(iter, MONGO_BSON_REGEX)) {
+      if (regex) {
+         *regex = iter->user_data6;
+      }
+      if (options) {
+         *options = iter->user_data7;
+      }
+      return;
+   }
+
+   g_warning("Current value is not a Regex.");
 }
 
+/**
+ * mongo_bson_iter_get_value_string:
+ * @iter: (in): A #MongoBsonIter.
+ * @length: (out) (allow-none): The length of the resulting string.
+ *
+ * Fetches the current value pointed to by @iter if it is a
+ * %MONGO_BSON_UTF8. If @length is not %NULL, then the length of the
+ * string will be stored in the location pointed to by @length.
+ *
+ * Returns: A string which should not be modified or freed.
+ */
 const gchar *
-mongo_bson_iter_get_value_string (MongoBsonIter *iter)
+mongo_bson_iter_get_value_string (MongoBsonIter *iter,
+                                  gsize         *length)
 {
-   const gchar *value;
-   MongoBson *bson;
-   gsize value_offset;
-   gsize offset;
+   gint32 real_length;
 
    g_return_val_if_fail(iter != NULL, NULL);
-   g_return_val_if_fail(iter->user_data1 != NULL, NULL);
-   g_return_val_if_fail(iter->user_data2 != NULL, NULL);
-   g_return_val_if_fail(iter->user_data3 != NULL, NULL);
+   g_return_val_if_fail(iter->user_data6 != NULL, NULL);
+   g_return_val_if_fail(iter->user_data7 != NULL, NULL);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   ENSURE_TYPE(bson, offset, MONGO_BSON_UTF8, NULL);
-   value_offset = (gsize)iter->user_data3;
-   value = (const gchar *)&bson->buf->data[value_offset];
+   if (ITER_IS_TYPE(iter, MONGO_BSON_UTF8)) {
+      if (length) {
+         memcpy(&real_length, iter->user_data6, sizeof real_length);
+         *length = GINT_FROM_LE(real_length);
+      }
+      return iter->user_data7;
+   }
 
-   return value;
+   g_warning("Current value is not a String");
+
+   return NULL;
 }
 
+/**
+ * mongo_bson_iter_get_value_timeval:
+ * @iter: (in): A #MongoBsonIter.
+ * @value: (out): A location for a #GTimeVal.
+ *
+ * Fetches the current value pointed to by @iter as a #GTimeVal if the type
+ * is a %MONGO_BSON_DATE_TIME.
+ */
 void
 mongo_bson_iter_get_value_timeval (MongoBsonIter *iter,
                                    GTimeVal      *value)
 {
-   MongoBson *bson;
    gint64 v_int64;
-   gsize value_offset;
-   gsize offset;
 
    g_return_if_fail(iter != NULL);
    g_return_if_fail(value != NULL);
-   g_return_if_fail(iter->user_data1 != NULL);
-   g_return_if_fail(iter->user_data2 != NULL);
-   g_return_if_fail(iter->user_data3 != NULL);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   ENSURE_TYPE(bson, offset, MONGO_BSON_UTF8, );
-   value_offset = (gsize)iter->user_data3;
-   v_int64 = *(gint64 *)&bson->buf->data[value_offset];
+   if (ITER_IS_TYPE(iter, MONGO_BSON_DATE_TIME)) {
+      memcpy(&v_int64, iter->user_data6, sizeof v_int64);
+      v_int64 = GINT64_FROM_LE(v_int64);
+      value->tv_sec = v_int64 / 1000;
+      value->tv_usec = v_int64 % 1000;
+      return;
+   }
 
-   value->tv_sec = v_int64 / 1000;
-   value->tv_usec = v_int64 % 1000;
+   g_warning("Current value is not a DateTime");
 }
 
+/**
+ * mongo_bson_iter_get_value_type:
+ * @iter: (in): A #MongoBsonIter.
+ *
+ * Fetches the #MongoBsonType currently pointed to by @iter.
+ *
+ * Returns: A #MongoBsonType.
+ */
 MongoBsonType
 mongo_bson_iter_get_value_type (MongoBsonIter *iter)
 {
    MongoBsonType type;
-   MongoBson *bson;
-   gsize offset;
 
    g_return_val_if_fail(iter != NULL, 0);
-   g_return_val_if_fail(iter->user_data1 != NULL, 0);
-   g_return_val_if_fail(iter->user_data2 != NULL, 0);
+   g_return_val_if_fail(iter->user_data5 != NULL, 0);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   type = bson->buf->data[offset];
+   type = GPOINTER_TO_INT(iter->user_data5);
 
    switch (type) {
    case MONGO_BSON_DOUBLE:
@@ -909,7 +1005,7 @@ mongo_bson_iter_get_value_type (MongoBsonIter *iter)
    case MONGO_BSON_INT64:
       return type;
    default:
-      g_warning("Unknown bson type %0d", type);
+      g_warning("Unknown BSON type 0x%02x", type);
       return 0;
    }
 }
@@ -934,55 +1030,142 @@ mongo_bson_iter_recurse (MongoBsonIter *iter,
    return FALSE;
 }
 
+guint
+first_nul (const gchar *data,
+           guint        max_bytes)
+{
+   guint i;
+
+   for (i = 0; i < max_bytes; i++) {
+      if (!data[i]) {
+         return i;
+      }
+   }
+
+   return 0;
+}
+
 gboolean
 mongo_bson_iter_next (MongoBsonIter *iter)
 {
-#if 0
-   MongoBsonType cur_type;
-   MongoBson *bson;
-   gboolean ret = FALSE;
+   const guint8 *rawbuf;
+   gsize rawbuf_len;
    gsize offset;
-   gsize value_offset;
+   const gchar *key;
+   MongoBsonType type;
+   const guint8 *value1;
+   const guint8 *value2;
+   const gchar *end = NULL;
+   guint max_len;
 
    g_return_val_if_fail(iter != NULL, FALSE);
-   g_return_val_if_fail(iter->user_data1 != NULL, FALSE);
 
-   bson = iter->user_data1;
-   offset = (gsize)iter->user_data2;
-   value_offset = (gsize)iter->user_data3;
+   /*
+    * Copy values onto stack from iter.
+    */
+   rawbuf = iter->user_data1;
+   rawbuf_len = GPOINTER_TO_SIZE(iter->user_data2);
+   offset = GPOINTER_TO_SIZE(iter->user_data3);
+   key = (const gchar *)iter->user_data4;
+   type = GPOINTER_TO_INT(iter->user_data5);
+   value1 = (const guint8 *)iter->user_data6;
+   value2 = (const guint8 *)iter->user_data7;
 
-   if (!offset) {
-      offset = 4;
-      value_offset = ...;
+   /*
+    * Check for end of buffer.
+    */
+   if ((offset + 1) >= rawbuf_len) {
+      goto failure;
    }
 
-   if ((offset >= bson->buf->len) || (bson->buf->data[offset] == '\0')) {
-      return FALSE;
+   /*
+    * Get the type of the next field.
+    */
+   type = rawbuf[++offset];
+
+   /*
+    * Get the key of the next field.
+    */
+   key = (const gchar *)&rawbuf[++offset];
+   max_len = first_nul(key, rawbuf_len - offset - 1);
+   if (!g_utf8_validate(key, max_len, &end)) {
+      goto failure;
    }
+   offset += strlen(key) + 1;
 
-   cur_type = bson->buf[offset];
-   offset = value_offset;
-
-   switch (cur_type) {
-   case MONGO_BSON_STRING:
-      break;
-   case MONGO_BSON_INT32:
-      offset += 4;
-      break;
+   switch (type) {
+   case MONGO_BSON_UTF8:
+      if ((offset + 5) < rawbuf_len) {
+         value1 = &rawbuf[offset];
+         offset += 4;
+         value2 = &rawbuf[offset];
+         max_len = first_nul((gchar *)value2, rawbuf_len - offset - 1);
+         if (!g_utf8_validate((gchar *)value2, max_len, &end)) {
+            goto failure;
+         }
+         offset += strlen((gchar *)value2) + 1;
+         goto success;
+      }
+      goto failure;
+   case MONGO_BSON_DOCUMENT:
+   case MONGO_BSON_ARRAY:
+      g_warning("TODO DOCUMENT AND ARRAY");
+      goto failure;
+   case MONGO_BSON_NULL:
+   case MONGO_BSON_UNDEFINED:
+      value1 = NULL;
+      value2 = NULL;
+      goto success;
+   case MONGO_BSON_OBJECT_ID:
+      if ((offset + 12) < rawbuf_len) {
+         value1 = &rawbuf[offset];
+         value2 = NULL;
+         offset += 12;
+         goto success;
+      }
+      goto failure;
+   case MONGO_BSON_BOOLEAN:
+      if ((offset + 1) < rawbuf_len) {
+         value1 = &rawbuf[offset];
+         value2 = NULL;
+         offset++;
+         goto success;
+      }
+      goto failure;
+   case MONGO_BSON_DATE_TIME:
+   case MONGO_BSON_DOUBLE:
    case MONGO_BSON_INT64:
-      offset += 8;
-      break;
+      if ((offset + 8) < rawbuf_len) {
+         value1 = &rawbuf[offset];
+         value2 = NULL;
+         offset += 8;
+         goto success;
+      }
+      goto failure;
+   case MONGO_BSON_REGEX:
+      g_warning("TODO REGEX");
+      goto failure;
+   case MONGO_BSON_INT32:
+      if ((offset + 4) < rawbuf_len) {
+         value1 = &rawbuf[offset];
+         value2 = NULL;
+         offset += 4;
+         goto success;
+      }
+      goto failure;
    default:
-      /* Poorly formatted */
-      return FALSE;
+      goto failure;
    }
 
-   iter->user_data2 = GSIZE_TO_POINTER(offset);
-   iter->user_data3 = GSIZE_TO_POINTER(value_offset);
+success:
+   iter->user_data3 = GSIZE_TO_POINTER(offset);
+   iter->user_data4 = (gpointer)key;
+   iter->user_data5 = GINT_TO_POINTER(type);
+   iter->user_data6 = (gpointer)value1;
+   iter->user_data7 = (gpointer)value2;
+   return TRUE;
 
-   ret = TRUE;
-
-   return ret;
-#endif
+failure:
+   memset(iter, 0, sizeof *iter);
    return FALSE;
 }

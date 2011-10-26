@@ -160,12 +160,81 @@ iter_tests (void)
 {
    MongoBson *bson;
    MongoBsonIter iter;
+   GDateTime *dt;
+   GTimeVal tv;
 
    bson = get_bson("test1.bson");
-
    mongo_bson_iter_init(&iter, bson);
    g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpint(MONGO_BSON_INT32, ==, mongo_bson_iter_get_value_type(&iter));
    g_assert_cmpstr("int", ==, mongo_bson_iter_get_key(&iter));
+   g_assert_cmpint(1, ==, mongo_bson_iter_get_value_int(&iter));
+   g_assert(!mongo_bson_iter_next(&iter));
+   mongo_bson_unref(bson);
+
+   bson = get_bson("test2.bson");
+   mongo_bson_iter_init(&iter, bson);
+   g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpint(MONGO_BSON_INT64, ==, mongo_bson_iter_get_value_type(&iter));
+   g_assert_cmpstr("int64", ==, mongo_bson_iter_get_key(&iter));
+   g_assert_cmpint(1L, ==, mongo_bson_iter_get_value_int64(&iter));
+   g_assert(!mongo_bson_iter_next(&iter));
+   mongo_bson_unref(bson);
+
+   bson = get_bson("test3.bson");
+   mongo_bson_iter_init(&iter, bson);
+   g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpint(MONGO_BSON_DOUBLE, ==, mongo_bson_iter_get_value_type(&iter));
+   g_assert_cmpstr("double", ==, mongo_bson_iter_get_key(&iter));
+   g_assert_cmpint(1.123, ==, mongo_bson_iter_get_value_double(&iter));
+   g_assert(!mongo_bson_iter_next(&iter));
+   mongo_bson_unref(bson);
+
+   bson = get_bson("test4.bson");
+   mongo_bson_iter_init(&iter, bson);
+   g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpint(MONGO_BSON_DATE_TIME, ==, mongo_bson_iter_get_value_type(&iter));
+   g_assert_cmpstr("utc", ==, mongo_bson_iter_get_key(&iter));
+   mongo_bson_iter_get_value_timeval(&iter, &tv);
+   g_assert_cmpint(tv.tv_sec, ==, 1319285594);
+   g_assert_cmpint(tv.tv_usec, ==, 123);
+   dt = mongo_bson_iter_get_value_date_time(&iter);
+   g_assert_cmpint(g_date_time_get_year(dt), ==, 2011);
+   g_assert_cmpint(g_date_time_get_month(dt), ==, 10);
+   g_assert_cmpint(g_date_time_get_day_of_month(dt), ==, 22);
+   g_assert_cmpint(g_date_time_get_hour(dt), ==, 12);
+   g_assert_cmpint(g_date_time_get_minute(dt), ==, 13);
+   g_assert_cmpint(g_date_time_get_second(dt), ==, 14);
+   g_assert_cmpint(g_date_time_get_microsecond(dt), ==, 123);
+   g_date_time_unref(dt);
+   g_assert(!mongo_bson_iter_next(&iter));
+   mongo_bson_unref(bson);
+
+   bson = get_bson("test5.bson");
+   mongo_bson_iter_init(&iter, bson);
+   g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpint(MONGO_BSON_UTF8, ==, mongo_bson_iter_get_value_type(&iter));
+   g_assert_cmpstr("string", ==, mongo_bson_iter_get_key(&iter));
+   g_assert_cmpstr("some string", ==, mongo_bson_iter_get_value_string(&iter, NULL));
+   g_assert(!mongo_bson_iter_next(&iter));
+   mongo_bson_unref(bson);
+
+   bson = get_bson("test9.bson");
+   mongo_bson_iter_init(&iter, bson);
+   g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpint(MONGO_BSON_NULL, ==, mongo_bson_iter_get_value_type(&iter));
+   g_assert_cmpstr("null", ==, mongo_bson_iter_get_key(&iter));
+   g_assert(!mongo_bson_iter_next(&iter));
+   mongo_bson_unref(bson);
+
+   bson = get_bson("test11.bson");
+   mongo_bson_iter_init(&iter, bson);
+   g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpint(MONGO_BSON_UTF8, ==, mongo_bson_iter_get_value_type(&iter));
+   g_assert_cmpstr("hello", ==, mongo_bson_iter_get_key(&iter));
+   g_assert_cmpstr("world", ==, mongo_bson_iter_get_value_string(&iter, NULL));
+   g_assert(!mongo_bson_iter_next(&iter));
+   mongo_bson_unref(bson);
 }
 
 gint

@@ -69,7 +69,7 @@ const guint8  *mongo_bson_get_data                 (MongoBson      *bson,
                                                     gsize          *length);
 MongoBson     *mongo_bson_new                      (void);
 MongoBson     *mongo_bson_new_from_data            (const guint8   *buffer,
-                                                    gsize           max_length);
+                                                    gsize           length);
 MongoBson     *mongo_bson_ref                      (MongoBson      *bson);
 void           mongo_bson_unref                    (MongoBson      *bson);
 void           mongo_bson_append_array             (MongoBson      *bson,

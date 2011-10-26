@@ -46,23 +46,36 @@ mongo_bson_dispose (MongoBson *bson)
    g_byte_array_free(bson->buf, TRUE);
 }
 
+/**
+ * mongo_bson_new_from_data:
+ * @buffer: (in): The buffer to create a #MongoBson.
+ * @length: (in): The length of @buffer.
+ *
+ * Creates a new #MongoBson instance using the buffer and the length.
+ *
+ * Returns: A new #MongoBson that should be freed with mongo_bson_unref().
+ */
 MongoBson *
 mongo_bson_new_from_data (const guint8 *buffer,
-                          gsize         max_length)
+                          gsize         length)
 {
    MongoBson *bson;
-   gint32 length;
+   guint32 bson_len;
 
    g_return_val_if_fail(buffer != NULL, NULL);
 
-   length = *(gint32 *)buffer;
-   if (length > max_length) {
+   /*
+    * The first 4 bytes of a BSON are the length, including the 4 bytes
+    * containing said length.
+    */
+   memcpy(&bson_len, buffer, sizeof bson_len);
+   bson_len = GINT_FROM_LE(bson_len);
+   if (bson_len != length) {
       return NULL;
    }
 
    bson = g_slice_new0(MongoBson);
    bson->ref_count = 1;
-
    bson->buf = g_byte_array_sized_new(length);
    g_byte_array_append(bson->buf, buffer, length);
 

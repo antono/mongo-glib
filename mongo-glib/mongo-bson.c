@@ -178,6 +178,13 @@ mongo_bson_get_type (void)
    return type_id;
 }
 
+/**
+ * mongo_bson_type_get_type:
+ *
+ * Fetches the #GType for a #MongoBsonType.
+ *
+ * Returns: A #GType.
+ */
 GType
 mongo_bson_type_get_type (void)
 {
@@ -207,6 +214,22 @@ mongo_bson_type_get_type (void)
    return type_id;
 }
 
+/**
+ * mongo_bson_append:
+ * @bson: (in): A #MongoBson.
+ * @type: (in) (type MongoBsonType): A #MongoBsonType.
+ * @key: (in): The key for the field to append.
+ * @data1: (in): The data for the first chunk of the data.
+ * @len1: (in): The length of @data1.
+ * @data2: (in): The data for the second chunk of the data.
+ * @len2: (in): The length of @data2.
+ *
+ * This utility function helps us build a buffer for a #MongoBson given
+ * the various #MongoBsonType<!-- -->'s and two-part data sections of
+ * some fields.
+ *
+ * If @data2 is set, @data1 must also be set.
+ */
 static void
 mongo_bson_append (MongoBson    *bson,
                    guint8        type,
@@ -218,43 +241,59 @@ mongo_bson_append (MongoBson    *bson,
 {
    const guint8 trailing = 0;
    gint32 doc_len;
-   gsize key_len;
 
    g_return_if_fail(bson != NULL);
    g_return_if_fail(type != 0);
    g_return_if_fail(key != NULL);
    g_return_if_fail(data1 != NULL || len1 == 0);
    g_return_if_fail(data2 != NULL || len2 == 0);
+   g_return_if_fail(!data2 || data1);
 
-   /* Drop our trailing null byte. */
-   bson->buf->len--;
+   /*
+    * Overwrite our trailing byte with the type for this key.
+    */
+   bson->buf->data[bson->buf->len - 1] = type;
 
-   /* Type declaration */
-   g_byte_array_append(bson->buf, &type, 1);
+   /*
+    * Append the field name as a BSON cstring.
+    */
+   g_byte_array_append(bson->buf, (guint8 *)key, strlen(key) + 1);
 
-   /* Field name as cstring */
-   key_len = strlen(key) + 1;
-   g_byte_array_append(bson->buf, (guint8 *)key, key_len);
-
-   /* Add first data section if needed */
+   /*
+    * Append the data sections if needed.
+    */
    if (data1) {
       g_byte_array_append(bson->buf, data1, len1);
+      if (data2) {
+         g_byte_array_append(bson->buf, data2, len2);
+      }
    }
 
-   /* Add second data section if needed */
-   if (data2) {
-      g_byte_array_append(bson->buf, data2, len2);
-   }
-
-   /* Update document length */
-   doc_len = GINT_FROM_LE(*(gint32 *)bson->buf->data);
-   doc_len += 1 + key_len + len1 + len2;
-   *(gint32 *)bson->buf->data = GINT_TO_LE(doc_len);
-
-   /* Add trailing NULL byte */
+   /*
+    * Append our trailing byte.
+    */
    g_byte_array_append(bson->buf, &trailing, 1);
+
+   /*
+    * Update the document length of the buffer.
+    */
+   doc_len = GINT_TO_LE(bson->buf->len);
+   memcpy(bson->buf->data, &doc_len, sizeof doc_len);
 }
 
+/**
+ * mongo_bson_append_array:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): The field name.
+ * @value: (in): The #MongoBson array to append.
+ *
+ * Appends a #MongoBson containing an array. A #MongoBson array is a document
+ * that contains fields with string keys containing integers incrementally.
+ *
+ * [[[
+ * {"0": "First Value", "1": "Second Value"}
+ * ]]]
+ */
 void
 mongo_bson_append_array (MongoBson   *bson,
                          const gchar *key,
@@ -269,6 +308,15 @@ mongo_bson_append_array (MongoBson   *bson,
                      NULL, 0);
 }
 
+/**
+ * mongo_bson_append_boolean:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): The string containing key.
+ * @value: (in): A value to store in the document.
+ *
+ * Stores the value specified by @value as a boolean in the document
+ * under @key.
+ */
 void
 mongo_bson_append_boolean (MongoBson   *bson,
                            const gchar *key,
@@ -282,6 +330,14 @@ mongo_bson_append_boolean (MongoBson   *bson,
    mongo_bson_append(bson, MONGO_BSON_BOOLEAN, key, &b, 1, NULL, 0);
 }
 
+/**
+ * mongo_bson_append_bson:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ * @value: (in): A #MongoBson to store.
+ *
+ * Stores the #MongoBson in the document under @key.
+ */
 void
 mongo_bson_append_bson (MongoBson   *bson,
                         const gchar *key,
@@ -296,6 +352,14 @@ mongo_bson_append_bson (MongoBson   *bson,
                      NULL, 0);
 }
 
+/**
+ * mongo_bson_append_date_time:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ * @value: (in): A #GDateTime to store.
+ *
+ * Appends the #GDateTime to the #MongoBson under @key.
+ */
 void
 mongo_bson_append_date_time (MongoBson   *bson,
                              const gchar *key,
@@ -315,6 +379,14 @@ mongo_bson_append_date_time (MongoBson   *bson,
    mongo_bson_append_timeval(bson, key, &tv);
 }
 
+/**
+ * mongo_bson_append_double:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ * @value: (in): A #gdouble.
+ *
+ * Appends the #gdouble @value to the document under @key.
+ */
 void
 mongo_bson_append_double (MongoBson   *bson,
                           const gchar *key,
@@ -328,6 +400,14 @@ mongo_bson_append_double (MongoBson   *bson,
                      NULL, 0);
 }
 
+/**
+ * mongo_bson_append_int:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ * @value: (in): A #gint32 containing the value.
+ *
+ * Appends @value to the document under @key.
+ */
 void
 mongo_bson_append_int (MongoBson   *bson,
                        const gchar *key,
@@ -341,6 +421,14 @@ mongo_bson_append_int (MongoBson   *bson,
                      NULL, 0);
 }
 
+/**
+ * mongo_bson_append_int64:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ * @value: (in): A #gint64 containing the value.
+ *
+ * Appends @value to the document under @key.
+ */
 void
 mongo_bson_append_int64 (MongoBson   *bson,
                          const gchar *key,
@@ -354,6 +442,13 @@ mongo_bson_append_int64 (MongoBson   *bson,
                      NULL, 0);
 }
 
+/**
+ * mongo_bson_append_null:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ *
+ * Appends a %NULL value to the document under @key.
+ */
 void
 mongo_bson_append_null (MongoBson   *bson,
                         const gchar *key)
@@ -364,6 +459,14 @@ mongo_bson_append_null (MongoBson   *bson,
    mongo_bson_append(bson, MONGO_BSON_NULL, key, NULL, 0, NULL, 0);
 }
 
+/**
+ * mongo_bson_append_object_id:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ * @object_id: (in): A #MongoObjectId.
+ *
+ * Appends @object_id to the document under @key.
+ */
 void
 mongo_bson_append_object_id (MongoBson     *bson,
                              const gchar   *key,
@@ -378,6 +481,15 @@ mongo_bson_append_object_id (MongoBson     *bson,
                      NULL, 0);
 }
 
+/**
+ * mongo_bson_append_regex:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ * @regex: (in): A string containing a regex.
+ * @options: (in): Options for the regex.
+ *
+ * Appends a regex to the document under @key.
+ */
 void
 mongo_bson_append_regex (MongoBson   *bson,
                          const gchar *key,
@@ -397,6 +509,14 @@ mongo_bson_append_regex (MongoBson   *bson,
                      (const guint8 *)options, strlen(options) + 1);
 }
 
+/**
+ * mongo_bson_append_string:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ * @value: (in): A string containing the value.
+ *
+ * Stores the string @value in the document under @key.
+ */
 void
 mongo_bson_append_string (MongoBson   *bson,
                           const gchar *key,
@@ -415,6 +535,17 @@ mongo_bson_append_string (MongoBson   *bson,
                      (const guint8 *)value, value_len);
 }
 
+/**
+ * mongo_bson_append_timeval:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ * @value: (in): A #GTimeVal containing the date and time.
+ *
+ * Appends the date and time represented by @value up to milliseconds.
+ * The value is stored in the document under @key.
+ *
+ * See also: mongo_bson_append_date_time().
+ */
 void
 mongo_bson_append_timeval (MongoBson   *bson,
                            const gchar *key,
@@ -432,6 +563,13 @@ mongo_bson_append_timeval (MongoBson   *bson,
                      NULL, 0);
 }
 
+/**
+ * mongo_bson_append_undefined:
+ * @bson: (in): A #MongoBson.
+ * @key: (in): A string containing the key.
+ *
+ * Appends a javascript "undefined" value in the document under @key.
+ */
 void
 mongo_bson_append_undefined (MongoBson   *bson,
                              const gchar *key)
@@ -776,11 +914,13 @@ mongo_bson_iter_recurse (MongoBsonIter *iter,
    /*
     * TODO:
     */
+   return FALSE;
 }
 
 gboolean
 mongo_bson_iter_next (MongoBsonIter *iter)
 {
+#if 0
    MongoBsonType cur_type;
    MongoBson *bson;
    gboolean ret = FALSE;
@@ -826,4 +966,6 @@ mongo_bson_iter_next (MongoBsonIter *iter)
    ret = TRUE;
 
    return ret;
+#endif
+   return FALSE;
 }

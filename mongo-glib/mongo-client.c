@@ -43,6 +43,7 @@ struct _MongoClientPrivate
    MongoClientPeer    primary;
    guint              timeout;
    GSocketConnection *connection;
+   gint               next_id;
 };
 
 enum
@@ -161,13 +162,115 @@ mongo_client_set_timeout (MongoClient *client,
    g_object_notify_by_pspec(G_OBJECT(client), gParamSpecs[PROP_TIMEOUT]);
 }
 
+static gint
+mongo_client_get_next_id (MongoClient *client)
+{
+   g_return_val_if_fail(MONGO_IS_CLIENT(client), 0);
+   return g_atomic_int_add(&client->priv->next_id, 1);
+}
+
+static void
+mongo_client_send_write_cb (GObject      *object,
+                            GAsyncResult *result,
+                            gpointer      user_data)
+{
+   GSimpleAsyncResult *simple = user_data;
+   GOutputStream *output = (GOutputStream *)object;
+   gboolean want_reply;
+   GError *error = NULL;
+   gssize n_written;
+
+   g_return_if_fail(G_IS_OUTPUT_STREAM(output));
+   g_return_if_fail(G_IS_SIMPLE_ASYNC_RESULT(simple));
+
+   n_written = g_output_stream_write_finish(output, result, &error);
+   if (n_written <= 0) {
+      g_simple_async_result_take_error(simple, error);
+      g_simple_async_result_complete_in_idle(simple);
+      g_object_unref(simple);
+      return;
+   }
+
+   /*
+    * TODO: Do we need to write more data from the buffer?
+    */
+
+   want_reply = GPOINTER_TO_INT(g_object_get_data(user_data, "want-reply"));
+   if (want_reply) {
+      g_debug("Waiting for reply from server!!");
+      /*
+       * TODO: Register simple for reply handler.
+       */
+      return;
+   }
+
+   g_simple_async_result_complete_in_idle(simple);
+   g_object_unref(simple);
+}
+
 void
 mongo_client_send_async (MongoClient         *client,
                          const gchar         *db,
                          MongoBson           *bson,
+                         MongoOperation       operation,
+                         gboolean             want_reply,
                          GAsyncReadyCallback  callback,
                          gpointer             user_data)
 {
+   MongoClientPrivate *priv;
+   GSimpleAsyncResult *simple;
+   GOutputStream *output;
+   const guint8 *buffer;
+   gsize buffer_length = 0;
+#pragma pack(push, 4)
+   struct {
+      gint32 length;
+      gint32 id;
+      gint32 flags;
+      gint32 operation;
+      guint8 data[0];
+   } *packed;
+#pragma pack(pop)
+
+   g_return_if_fail(MONGO_IS_CLIENT(client));
+   g_return_if_fail(db != NULL);
+   g_return_if_fail(bson != NULL);
+   g_return_if_fail(callback != NULL);
+
+   priv = client->priv;
+
+   if (!priv->connection) {
+      g_warning("Not connected, failed to send.");
+      return;
+   }
+
+   /*
+    * TODO: We should find a way to use an io_vec here.
+    */
+   packed = g_malloc((sizeof *packed) + buffer_length);
+   packed->length = (sizeof *packed) + buffer_length;
+   packed->id = GINT_TO_LE(mongo_client_get_next_id(client));
+   packed->flags = GINT_TO_LE(0);
+   packed->operation = GINT_TO_LE(operation);
+   memcpy(packed->data, buffer, buffer_length);
+
+   /*
+    * XXX: MULTIPLE ASYNC WRITE CALLS IS INVALID API USE!!!
+    */
+
+   simple = g_simple_async_result_new(G_OBJECT(client), callback, user_data,
+                                      mongo_client_send_async);
+   output = g_io_stream_get_output_stream(G_IO_STREAM(priv->connection));
+   g_object_set_data(G_OBJECT(simple),
+                     "want-reply", GINT_TO_POINTER(want_reply));
+   g_output_stream_write_async(output,
+                               packed,
+                               (sizeof *packed) + buffer_length,
+                               G_PRIORITY_DEFAULT,
+                               NULL,
+                               mongo_client_send_write_cb,
+                               simple);
+   g_free(packed);
 }
 
 MongoBson *
@@ -252,7 +355,11 @@ mongo_client_connect_cb (GObject      *object,
    mongo_bson_append_int(bson, "isadmin", 1);
    //mongo_bson_finish(bson);
 
-   mongo_client_send_async(client, "admin", bson,
+   mongo_client_send_async(client,
+                           "admin",
+                           bson,
+                           MONGO_OPERATION_QUERY,
+                           TRUE,
                            mongo_client_isadmin_cb,
                            simple);
 }
@@ -469,4 +576,27 @@ GQuark
 mongo_client_error_quark (void)
 {
    return g_quark_from_static_string("mongo_client_error_quark");
+}
+
+GType
+mongo_operation_get_type (void)
+{
+   static GType type_id = 0;
+   static gsize initialized = FALSE;
+   static const GEnumValue values[] = {
+      { MONGO_OPERATION_UPDATE,       "MONGO_OPERATION_UPDATE",       "UPDATE" },
+      { MONGO_OPERATION_INSERT,       "MONGO_OPERATION_INSERT",       "INSERT" },
+      { MONGO_OPERATION_QUERY,        "MONGO_OPERATION_QUERY",        "QUERY" },
+      { MONGO_OPERATION_GET_MORE,     "MONGO_OPERATION_GET_MORE",     "GET_MORE" },
+      { MONGO_OPERATION_DELETE,       "MONGO_OPERATION_DELETE",       "DELETE" },
+      { MONGO_OPERATION_KILL_CURSORS, "MONGO_OPERATION_KILL_CURSORS", "KILL_CURSORS" },
+      { 0 }
+   };
+
+   if (g_once_init_enter(&initialized)) {
+      type_id = g_enum_register_static("MongoOperation", values);
+      g_once_init_leave(&initialized, TRUE);
+   }
+
+   return type_id;
 }

@@ -26,6 +26,7 @@
 G_BEGIN_DECLS
 
 #define MONGO_TYPE_CLIENT            (mongo_client_get_type())
+#define MONGO_TYPE_OPERATION         (mongo_operation_get_type())
 #define MONGO_CLIENT(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MONGO_TYPE_CLIENT, MongoClient))
 #define MONGO_CLIENT_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MONGO_TYPE_CLIENT, MongoClient const))
 #define MONGO_CLIENT_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MONGO_TYPE_CLIENT, MongoClientClass))
@@ -38,10 +39,21 @@ typedef struct _MongoClient        MongoClient;
 typedef struct _MongoClientClass   MongoClientClass;
 typedef struct _MongoClientPrivate MongoClientPrivate;
 typedef enum   _MongoClientError   MongoClientError;
+typedef enum   _MongoOperation     MongoOperation;
 
 enum _MongoClientError
 {
    MONGO_CLIENT_ERROR_NOT_PRIMARY = 1,
+};
+
+enum _MongoOperation
+{
+   MONGO_OPERATION_UPDATE       = 2001,
+   MONGO_OPERATION_INSERT       = 2002,
+   MONGO_OPERATION_QUERY        = 2004,
+   MONGO_OPERATION_GET_MORE     = 2005,
+   MONGO_OPERATION_DELETE       = 2006,
+   MONGO_OPERATION_KILL_CURSORS = 2007,
 };
 
 struct _MongoClient
@@ -76,6 +88,8 @@ MongoClient *mongo_client_new            (void);
 void         mongo_client_send_async     (MongoClient          *client,
                                           const gchar          *db,
                                           MongoBson            *bson,
+                                          MongoOperation        operation,
+                                          gboolean              want_reply,
                                           GAsyncReadyCallback   callback,
                                           gpointer              user_data);
 MongoBson   *mongo_client_send_finish    (MongoClient          *client,
@@ -87,6 +101,7 @@ void         mongo_client_set_port       (MongoClient          *client,
                                           guint                 port);
 void         mongo_client_set_timeout    (MongoClient          *client,
                                           guint                 timeout_msec);
+GType        mongo_operation_get_type    (void) G_GNUC_CONST;
 
 G_END_DECLS
 

@@ -7,4 +7,9 @@ a Mongo driver and BSON reader and writer. It can be used via GObject
 introspection, making it available to JavaScript via GJS, Python, Vala,
 and other languages.
 
-This driver is not optimized at all.
+This driver is not optimized at all. However, the difference in approach
+between the python bson module and MongoBson yields anywhere from about
+4x to 25x faster. This is because the bson python module builds a SON that
+requires all the data to be build first. MongoBson is instead implemented
+as a builder (meaning less memory consumption too). Take a look at
+examples/bson_tests.py.

@@ -29,6 +29,12 @@ struct _MongoBson
 #define ITER_IS_TYPE(iter, type) \
    (GPOINTER_TO_INT(iter->user_data5) == type)
 
+#if 0
+#define GOTO(_l) G_STMT_START { g_debug("GOTO("#_l"):%d", __LINE__); goto _l; } G_STMT_END
+#else
+#define GOTO(_l) goto _l
+#endif
+
 /**
  * mongo_bson_dispose:
  * @bson: A #MongoBson.
@@ -1024,13 +1030,28 @@ gboolean
 mongo_bson_iter_recurse (MongoBsonIter *iter,
                          MongoBsonIter *child)
 {
-   /*
-    * TODO:
-    */
+   gint32 buflen;
+
+   g_return_val_if_fail(iter != NULL, FALSE);
+   g_return_val_if_fail(iter != NULL, FALSE);
+   g_return_val_if_fail(child != NULL, FALSE);
+
+   if (ITER_IS_TYPE(iter, MONGO_BSON_ARRAY) ||
+       ITER_IS_TYPE(iter, MONGO_BSON_DOCUMENT)) {
+      memset(child, 0, sizeof *child);
+      memcpy(&buflen, iter->user_data6, sizeof buflen);
+      child->user_data1 = iter->user_data6;
+      child->user_data2 = GINT_TO_POINTER(GINT_FROM_LE(buflen));
+      child->user_data3 = GINT_TO_POINTER(3); /* End of size buffer */
+      return TRUE;
+   }
+
+   g_warning("Current value is not a BSON document or array.");
+
    return FALSE;
 }
 
-guint
+static inline guint
 first_nul (const gchar *data,
            guint        max_bytes)
 {
@@ -1056,7 +1077,7 @@ mongo_bson_iter_next (MongoBsonIter *iter)
    const guint8 *value1;
    const guint8 *value2;
    const gchar *end = NULL;
-   guint max_len;
+   gint32 max_len;
 
    g_return_val_if_fail(iter != NULL, FALSE);
 
@@ -1075,7 +1096,7 @@ mongo_bson_iter_next (MongoBsonIter *iter)
     * Check for end of buffer.
     */
    if ((offset + 1) >= rawbuf_len) {
-      goto failure;
+      GOTO(failure);
    }
 
    /*
@@ -1089,7 +1110,7 @@ mongo_bson_iter_next (MongoBsonIter *iter)
    key = (const gchar *)&rawbuf[++offset];
    max_len = first_nul(key, rawbuf_len - offset - 1);
    if (!g_utf8_validate(key, max_len, &end)) {
-      goto failure;
+      GOTO(failure);
    }
    offset += strlen(key) + 1;
 
@@ -1101,74 +1122,82 @@ mongo_bson_iter_next (MongoBsonIter *iter)
          value2 = &rawbuf[offset];
          max_len = first_nul((gchar *)value2, rawbuf_len - offset - 1);
          if (!g_utf8_validate((gchar *)value2, max_len, &end)) {
-            goto failure;
+            GOTO(failure);
          }
-         offset += strlen((gchar *)value2) + 1;
-         goto success;
+         offset += strlen((gchar *)value2);
+         GOTO(success);
       }
-      goto failure;
+      GOTO(failure);
    case MONGO_BSON_DOCUMENT:
    case MONGO_BSON_ARRAY:
-      g_warning("TODO DOCUMENT AND ARRAY");
-      goto failure;
+      if ((offset + 5) < rawbuf_len) {
+         value1 = &rawbuf[offset];
+         value2 = NULL;
+         memcpy(&max_len, value1, sizeof max_len);
+         max_len = GINT_FROM_LE(max_len);
+         if ((offset + max_len) < rawbuf_len) {
+            offset += max_len;
+            GOTO(success);
+         }
+      }
+      GOTO(failure);
    case MONGO_BSON_NULL:
    case MONGO_BSON_UNDEFINED:
       value1 = NULL;
       value2 = NULL;
-      goto success;
+      GOTO(success);
    case MONGO_BSON_OBJECT_ID:
       if ((offset + 12) < rawbuf_len) {
          value1 = &rawbuf[offset];
          value2 = NULL;
-         offset += 12;
-         goto success;
+         offset += 11;
+         GOTO(success);
       }
-      goto failure;
+      GOTO(failure);
    case MONGO_BSON_BOOLEAN:
       if ((offset + 1) < rawbuf_len) {
          value1 = &rawbuf[offset];
          value2 = NULL;
-         offset++;
-         goto success;
+         GOTO(success);
       }
-      goto failure;
+      GOTO(failure);
    case MONGO_BSON_DATE_TIME:
    case MONGO_BSON_DOUBLE:
    case MONGO_BSON_INT64:
       if ((offset + 8) < rawbuf_len) {
          value1 = &rawbuf[offset];
          value2 = NULL;
-         offset += 8;
-         goto success;
+         offset += 7;
+         GOTO(success);
       }
-      goto failure;
+      GOTO(failure);
    case MONGO_BSON_REGEX:
       value1 = &rawbuf[offset];
       max_len = first_nul((gchar *)value1, rawbuf_len - offset - 1);
       if (!g_utf8_validate((gchar *)value1, max_len, &end)) {
-         goto failure;
+         GOTO(failure);
       }
       offset += max_len + 1;
       if ((offset + 1) >= rawbuf_len) {
-         goto failure;
+         GOTO(failure);
       }
       value2 = &rawbuf[offset];
       max_len = first_nul((gchar *)value2, rawbuf_len - offset - 1);
       if (!g_utf8_validate((gchar *)value2, max_len, &end)) {
-         goto failure;
+         GOTO(failure);
       }
       offset += max_len + 1;
-      goto success;
+      GOTO(success);
    case MONGO_BSON_INT32:
       if ((offset + 4) < rawbuf_len) {
          value1 = &rawbuf[offset];
          value2 = NULL;
-         offset += 4;
-         goto success;
+         offset += 3;
+         GOTO(success);
       }
-      goto failure;
+      GOTO(failure);
    default:
-      goto failure;
+      GOTO(failure);
    }
 
 success:

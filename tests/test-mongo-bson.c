@@ -160,6 +160,7 @@ iter_tests (void)
 {
    MongoBson *bson;
    MongoBsonIter iter;
+   MongoBsonIter iter2;
    GDateTime *dt;
    GTimeVal tv;
    const gchar *regex = NULL;
@@ -218,6 +219,34 @@ iter_tests (void)
    g_assert_cmpint(MONGO_BSON_UTF8, ==, mongo_bson_iter_get_value_type(&iter));
    g_assert_cmpstr("string", ==, mongo_bson_iter_get_key(&iter));
    g_assert_cmpstr("some string", ==, mongo_bson_iter_get_value_string(&iter, NULL));
+   g_assert(!mongo_bson_iter_next(&iter));
+   mongo_bson_unref(bson);
+
+   bson = get_bson("test6.bson");
+   mongo_bson_iter_init(&iter, bson);
+   g_assert(mongo_bson_iter_next(&iter));
+   g_assert_cmpint(MONGO_BSON_ARRAY, ==, mongo_bson_iter_get_value_type(&iter));
+   g_assert_cmpstr("array[int]", ==, mongo_bson_iter_get_key(&iter));
+   g_assert(mongo_bson_iter_recurse(&iter, &iter2));
+   g_assert(mongo_bson_iter_next(&iter2));
+   g_assert_cmpstr("0", ==, mongo_bson_iter_get_key(&iter2));
+   g_assert_cmpint(1, ==, mongo_bson_iter_get_value_int(&iter2));
+   g_assert(mongo_bson_iter_next(&iter2));
+   g_assert_cmpstr("1", ==, mongo_bson_iter_get_key(&iter2));
+   g_assert_cmpint(2, ==, mongo_bson_iter_get_value_int(&iter2));
+   g_assert(mongo_bson_iter_next(&iter2));
+   g_assert_cmpstr("2", ==, mongo_bson_iter_get_key(&iter2));
+   g_assert_cmpint(3, ==, mongo_bson_iter_get_value_int(&iter2));
+   g_assert(mongo_bson_iter_next(&iter2));
+   g_assert_cmpstr("3", ==, mongo_bson_iter_get_key(&iter2));
+   g_assert_cmpint(4, ==, mongo_bson_iter_get_value_int(&iter2));
+   g_assert(mongo_bson_iter_next(&iter2));
+   g_assert_cmpstr("4", ==, mongo_bson_iter_get_key(&iter2));
+   g_assert_cmpint(5, ==, mongo_bson_iter_get_value_int(&iter2));
+   g_assert(mongo_bson_iter_next(&iter2));
+   g_assert_cmpstr("5", ==, mongo_bson_iter_get_key(&iter2));
+   g_assert_cmpint(6, ==, mongo_bson_iter_get_value_int(&iter2));
+   g_assert(!mongo_bson_iter_next(&iter2));
    g_assert(!mongo_bson_iter_next(&iter));
    mongo_bson_unref(bson);
 

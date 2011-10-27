@@ -44,6 +44,7 @@ struct _MongoClientPrivate
    guint              timeout;
    GSocketConnection *connection;
    gint               next_id;
+   guint8            *read_buffer;
 };
 
 enum
@@ -325,22 +326,50 @@ failure:
 }
 
 static void
+mongo_client_read_cb (GObject      *object,
+                      GAsyncResult *result,
+                      gpointer      user_data)
+{
+   GInputStream *input = (GInputStream *)object;
+   MongoClient *client = user_data;
+   GError *error = NULL;
+   gssize n_bytes;
+
+   g_return_if_fail(G_IS_INPUT_STREAM(input));
+   g_return_if_fail(G_IS_ASYNC_RESULT(result));
+   g_return_if_fail(MONGO_IS_CLIENT(client));
+
+   n_bytes = g_input_stream_read_finish(input, result, &error);
+   g_assert_no_error(error); // FIXME:
+   g_assert_cmpint(n_bytes, >, 0); // FIXME:
+
+   g_debug("Read %"G_GSIZE_FORMAT" bytes from server.", n_bytes);
+}
+
+static void
 mongo_client_connect_cb (GObject      *object,
                          GAsyncResult *result,
                          gpointer      user_data)
 {
+   MongoClientPrivate *priv;
    GSimpleAsyncResult *simple = user_data;
    GSocketConnection *connection;
    GSocketClient *connector = (GSocketClient *)object;
+   GInputStream *input;
    MongoClient *client;
    MongoBson *bson;
    GError *error = NULL;
 
    g_return_if_fail(G_IS_SOCKET_CLIENT(connector));
    g_return_if_fail(G_IS_ASYNC_RESULT(result));
-
    client = MONGO_CLIENT(g_async_result_get_source_object(user_data));
+   g_return_if_fail(MONGO_IS_CLIENT(client));
 
+   priv = client->priv;
+
+   /*
+    * Finish connection request.
+    */
    if (!(connection = g_socket_client_connect_finish(connector, result, &error))) {
       g_simple_async_result_take_error(simple, error);
       g_simple_async_result_complete_in_idle(simple);
@@ -348,12 +377,26 @@ mongo_client_connect_cb (GObject      *object,
       return;
    }
 
+   /*
+    * Update state.
+    */
    client->priv->state = MONGO_CLIENT_CONNECTED;
    client->priv->connection = connection;
 
-   bson = mongo_bson_new();
-   //mongo_bson_finish(bson);
+   /*
+    * Start receive loop.
+    */
+   input = g_io_stream_get_input_stream(G_IO_STREAM(connection));
+   /*
+    * TODO: Use cancellable, to cancel on dispose.
+    */
+   priv->read_buffer = g_malloc(1024);
+   g_input_stream_read_async(input, priv->read_buffer, 1024, G_PRIORITY_DEFAULT, NULL, mongo_client_read_cb, client);
 
+   /*
+    * Query to check that this is the master.
+    */
+   bson = mongo_bson_new();
    mongo_bson_append_int(bson, "isMaster", 1);
    mongo_client_send_async(client,
                            "admin",

@@ -1145,6 +1145,7 @@ mongo_bson_iter_next (MongoBsonIter *iter)
    case MONGO_BSON_UNDEFINED:
       value1 = NULL;
       value2 = NULL;
+      offset--;
       GOTO(success);
    case MONGO_BSON_OBJECT_ID:
       if ((offset + 12) < rawbuf_len) {

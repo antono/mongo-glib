@@ -1,0 +1,10 @@
+----------------------------------------------------------------------------
+        Mongo-GLib - A Mongo Driver for GObject Based Applications
+----------------------------------------------------------------------------
+
+This is a work-in-progress driver that uses GLib and GObject to implement
+a Mongo driver and BSON reader and writer. It can be used via GObject
+introspection, making it available to JavaScript via GJS, Python, Vala,
+and other languages.
+
+This driver is not optimized at all.

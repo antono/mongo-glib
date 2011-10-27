@@ -211,7 +211,7 @@ mongo_client_send_write_cb (GObject      *object,
 
 void
 mongo_client_send_async (MongoClient         *client,
-                         const gchar         *db,
+                         const gchar         *collection,
                          MongoBson           *bson,
                          MongoOperation       operation,
                          gboolean             want_reply,
@@ -223,18 +223,10 @@ mongo_client_send_async (MongoClient         *client,
    GOutputStream *output;
    const guint8 *buffer;
    gsize buffer_length = 0;
-#pragma pack(push, 4)
-   struct {
-      gint32 length;
-      gint32 id;
-      gint32 flags;
-      gint32 operation;
-      guint8 data[0];
-   } *packed;
-#pragma pack(pop)
+   GByteArray *packed;
 
    g_return_if_fail(MONGO_IS_CLIENT(client));
-   g_return_if_fail(db != NULL);
+   g_return_if_fail(collection != NULL);
    g_return_if_fail(bson != NULL);
    g_return_if_fail(callback != NULL);
 
@@ -245,15 +237,44 @@ mongo_client_send_async (MongoClient         *client,
       return;
    }
 
-   /*
-    * TODO: We should find a way to use an io_vec here.
-    */
-   packed = g_malloc((sizeof *packed) + buffer_length);
-   packed->length = (sizeof *packed) + buffer_length;
-   packed->id = GINT_TO_LE(mongo_client_get_next_id(client));
-   packed->flags = GINT_TO_LE(0);
-   packed->operation = GINT_TO_LE(operation);
-   memcpy(packed->data, buffer, buffer_length);
+   buffer = mongo_bson_get_data(bson, &buffer_length);
+   packed = g_byte_array_sized_new(20 + buffer_length);
+
+   {
+      guint32 len;
+      guint32 id;
+      guint32 zero = 0;
+      guint32 op;
+
+      len = GINT_TO_LE(16 + 4 + strlen(collection) + 1 + buffer_length);
+      id = mongo_client_get_next_id(client);
+      op = GUINT_TO_LE(operation);
+
+      // hack
+      if (operation == MONGO_OPERATION_QUERY) {
+         len += 8;
+      }
+
+      /*
+       * Append header.
+       */
+      g_byte_array_append(packed, (guint8 *)&len, sizeof len);
+      g_byte_array_append(packed, (guint8 *)&id, sizeof id);
+      g_byte_array_append(packed, (guint8 *)&zero, sizeof zero);
+      g_byte_array_append(packed, (guint8 *)&op, sizeof op);
+
+      if (operation == MONGO_OPERATION_QUERY) {
+         g_byte_array_append(packed, (guint8 *)&zero, sizeof zero); // skip
+         g_byte_array_append(packed, (guint8 *)&zero, sizeof zero); // limit
+      }
+
+      /*
+       * Append Message.
+       */
+      g_byte_array_append(packed, (guint8 *)&zero, sizeof zero); // TODO: query_opts
+      g_byte_array_append(packed, (guint8 *)collection, strlen(collection) + 1);
+      g_byte_array_append(packed, buffer, buffer_length);
+   }
 
    /*
     * XXX: MULTIPLE ASYNC WRITE CALLS IS INVALID API USE!!!
@@ -265,13 +286,13 @@ mongo_client_send_async (MongoClient         *client,
    g_object_set_data(G_OBJECT(simple),
                      "want-reply", GINT_TO_POINTER(want_reply));
    g_output_stream_write_async(output,
-                               packed,
-                               (sizeof *packed) + buffer_length,
+                               packed->data,
+                               packed->len,
                                G_PRIORITY_DEFAULT,
                                NULL,
                                mongo_client_send_write_cb,
                                simple);
-   g_free(packed);
+   g_byte_array_free(packed, TRUE);
 }
 
 MongoBson *

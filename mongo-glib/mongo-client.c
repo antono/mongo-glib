@@ -282,9 +282,9 @@ mongo_client_send_finish (MongoClient   *client,
 }
 
 static void
-mongo_client_isadmin_cb (GObject      *object,
-                         GAsyncResult *result,
-                         gpointer      user_data)
+mongo_client_ismaster_cb (GObject      *object,
+                          GAsyncResult *result,
+                          gpointer      user_data)
 {
    GSimpleAsyncResult *simple = user_data;
 #if 0
@@ -352,15 +352,15 @@ mongo_client_connect_cb (GObject      *object,
    client->priv->connection = connection;
 
    bson = mongo_bson_new();
-   mongo_bson_append_int(bson, "isadmin", 1);
    //mongo_bson_finish(bson);
 
+   mongo_bson_append_int(bson, "isMaster", 1);
    mongo_client_send_async(client,
                            "admin",
                            bson,
                            MONGO_OPERATION_QUERY,
                            TRUE,
-                           mongo_client_isadmin_cb,
+                           mongo_client_ismaster_cb,
                            simple);
 }
 

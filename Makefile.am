@@ -7,7 +7,7 @@ include tests/Makefile.include
 ACLOCAL_AMFLAGS = -I build/m4 ${ACLOCAL_FLAGS}
 DISTCHECK_CONFIGURE_FLAGS = --enable-maintainer-flags --enable-gtk-doc --enable-introspection
 
-mongodocdir = ${prefix}/doc/mongo-1.0
+mongodocdir = ${prefix}/doc/mongo-glib-1.0
 mongodoc_DATA =
 mongodoc_DATA += README
 mongodoc_DATA += COPYING

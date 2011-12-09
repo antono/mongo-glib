@@ -5,7 +5,7 @@
 This is a work-in-progress driver that uses GLib and GObject to implement
 a Mongo driver and BSON reader and writer. It can be used via GObject
 introspection, making it available to JavaScript via GJS, Python, Vala,
-and other languages.
+and many other languages[1].
 
 This driver is not optimized at all. However, the difference in approach
 between the python bson module and MongoBson yields anywhere from about
@@ -13,3 +13,5 @@ between the python bson module and MongoBson yields anywhere from about
 requires all the data to be build first. MongoBson is instead implemented
 as a builder (meaning less memory consumption too). Take a look at
 examples/bson_tests.py.
+
+[1]: https://live.gnome.org/GObjectIntrospection/Users
